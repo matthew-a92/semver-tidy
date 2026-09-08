@@ -65,8 +65,18 @@ npx tsc
 
 No runtime dependencies. TypeScript is the only build-time tool.
 
+## Testing
+
+```
+npm test
+```
+
+Tests are a small self-contained runner in `src/format.test.ts` — no test
+framework, just plain functions and thrown errors on mismatch. Running it
+builds first, then executes the compiled output with `node`.
+
 ## Status
 
 Early skeleton. Core normalization for `major.minor.patch`, prerelease,
-and build metadata is implemented; see the roadmap in the issue tracker
-for what's next (a CLI, comparison helpers, a test suite).
+and build metadata is implemented and covered by tests; see the roadmap
+in the issue tracker for what's next (a CLI, comparison helpers).
