@@ -159,3 +159,99 @@ export function formatVersion(input: string): FormatResult {
 export function formatVersions(inputs: readonly string[]): FormatResult[] {
   return inputs.map(formatVersion);
 }
+
+const CANONICAL_SEMVER =
+  /^([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
+
+interface ParsedVersion {
+  readonly major: number;
+  readonly minor: number;
+  readonly patch: number;
+  readonly prerelease: readonly string[] | null;
+}
+
+// compareVersions only accepts strings already in canonical form (i.e. the
+// output of formatVersion), so an invalid input here is a caller bug, not
+// bad user input — it throws rather than returning a FormatResult.
+function parseCanonical(version: string): ParsedVersion {
+  const match = CANONICAL_SEMVER.exec(version);
+  if (match === null) {
+    throw new Error(`not a canonical semver string: "${version}"`);
+  }
+  const prerelease = match[4];
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: prerelease === undefined ? null : prerelease.split("."),
+  };
+}
+
+function compareIdentifiers(a: string, b: string): number {
+  const aIsNumeric = DIGITS_ONLY.test(a);
+  const bIsNumeric = DIGITS_ONLY.test(b);
+
+  if (aIsNumeric && bIsNumeric) {
+    const aNum = Number(a);
+    const bNum = Number(b);
+    return aNum === bNum ? 0 : aNum < bNum ? -1 : 1;
+  }
+  if (aIsNumeric !== bIsNumeric) {
+    // Numeric identifiers always have lower precedence than alphanumeric ones.
+    return aIsNumeric ? -1 : 1;
+  }
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
+function comparePrerelease(a: readonly string[] | null, b: readonly string[] | null): number {
+  if (a === null && b === null) {
+    return 0;
+  }
+  // A version with a prerelease has lower precedence than the same version without one.
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i++) {
+    if (i >= a.length) {
+      return -1;
+    }
+    if (i >= b.length) {
+      return 1;
+    }
+    const cmp = compareIdentifiers(a[i]!, b[i]!);
+    if (cmp !== 0) {
+      return cmp;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Compares two canonical semver strings for sort order, following semver
+ * precedence rules (build metadata is ignored, as the spec requires).
+ * Returns a negative number, zero, or a positive number, suitable for
+ * passing directly to Array.prototype.sort.
+ *
+ * Both inputs must already be canonical semver, e.g. the output of
+ * formatVersion — this does not accept the messy input formatVersion does.
+ */
+export function compareVersions(a: string, b: string): number {
+  const left = parseCanonical(a);
+  const right = parseCanonical(b);
+
+  if (left.major !== right.major) {
+    return left.major < right.major ? -1 : 1;
+  }
+  if (left.minor !== right.minor) {
+    return left.minor < right.minor ? -1 : 1;
+  }
+  if (left.patch !== right.patch) {
+    return left.patch < right.patch ? -1 : 1;
+  }
+  return comparePrerelease(left.prerelease, right.prerelease);
+}

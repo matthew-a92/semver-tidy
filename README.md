@@ -43,11 +43,30 @@ formatVersions(["v1.0", "not-a-version", "2.0.0"]);
 //   { ok: false, reason: "invalid version number component \"not-a-version\"" },
 //   { ok: true, value: "2.0.0" },
 // ]
+
+compareVersions("1.2.3-alpha.2", "1.2.3-alpha.10");
+// -1 (numeric prerelease identifiers compare numerically, not lexically)
 ```
 
 `FormatResult` is a plain discriminated union (`{ ok: true, value }` or
 `{ ok: false, reason }`), so callers can branch on `.ok` without exceptions
 or a parsing library.
+
+`compareVersions` follows semver precedence rules (build metadata is
+ignored) and returns a negative number, zero, or a positive number, so it
+can be passed directly as an `Array.prototype.sort` comparator. Unlike
+`formatVersion`, it expects both inputs to already be canonical — pass it
+the output of `formatVersion`, not raw messy strings — and it throws if
+either input isn't well-formed semver:
+
+```ts
+const versions = ["v2.0", "1.0.0-alpha", "01.0.0"]
+  .map(formatVersion)
+  .filter((r): r is FormatSuccess => r.ok)
+  .map((r) => r.value)
+  .sort(compareVersions);
+// ["1.0.0-alpha", "1.0.0", "2.0.0"]
+```
 
 ## Design
 
@@ -78,5 +97,7 @@ builds first, then executes the compiled output with `node`.
 ## Status
 
 Early skeleton. Core normalization for `major.minor.patch`, prerelease,
-and build metadata is implemented and covered by tests; see the roadmap
-in the issue tracker for what's next (a CLI, comparison helpers).
+and build metadata is implemented and covered by tests, as is
+`compareVersions` for sorting the normalized output. See the roadmap in
+the issue tracker for what's next (a CLI, explicit range/comparator
+handling).

@@ -3,7 +3,7 @@
 // at the end. `console` and `process` are Node globals at runtime; they're
 // declared here instead of pulling in @types/node.
 
-import { formatVersion, formatVersions, type FormatResult } from "./format.js";
+import { formatVersion, formatVersions, compareVersions, type FormatResult } from "./format.js";
 
 declare const console: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void };
 declare const process: { exitCode: number };
@@ -181,6 +181,83 @@ test("formatVersions on an empty list returns an empty list", () => {
   const results = formatVersions([]);
   if (results.length !== 0) {
     throw new Error(`expected 0 results, got ${results.length}`);
+  }
+});
+
+// --- compareVersions ---
+
+function assertOrder(a: string, b: string, expected: -1 | 0 | 1): void {
+  const cmp = compareVersions(a, b);
+  const sign = cmp === 0 ? 0 : cmp < 0 ? -1 : 1;
+  if (sign !== expected) {
+    throw new Error(`expected compareVersions("${a}", "${b}") to be ${expected}, got ${cmp}`);
+  }
+  // The comparison must be antisymmetric.
+  const reverseCmp = compareVersions(b, a);
+  const reverseSign = reverseCmp === 0 ? 0 : reverseCmp < 0 ? -1 : 1;
+  if (reverseSign !== -expected) {
+    throw new Error(
+      `expected compareVersions("${b}", "${a}") to be ${-expected}, got ${reverseCmp}`,
+    );
+  }
+}
+
+test("equal versions compare equal", () => {
+  assertOrder("1.2.3", "1.2.3", 0);
+});
+
+test("major version takes precedence", () => {
+  assertOrder("1.2.3", "2.0.0", -1);
+});
+
+test("minor version breaks a major tie", () => {
+  assertOrder("1.2.3", "1.3.0", -1);
+});
+
+test("patch version breaks a minor tie", () => {
+  assertOrder("1.2.3", "1.2.4", -1);
+});
+
+test("a release has higher precedence than its prerelease", () => {
+  assertOrder("1.2.3-alpha", "1.2.3", -1);
+});
+
+test("numeric prerelease identifiers compare numerically, not lexically", () => {
+  assertOrder("1.2.3-alpha.2", "1.2.3-alpha.10", -1);
+});
+
+test("numeric prerelease identifiers have lower precedence than alphanumeric ones", () => {
+  assertOrder("1.2.3-1", "1.2.3-alpha", -1);
+});
+
+test("alphanumeric prerelease identifiers compare lexically", () => {
+  assertOrder("1.2.3-alpha", "1.2.3-beta", -1);
+});
+
+test("a shorter prerelease identifier list has lower precedence when a common prefix is equal", () => {
+  assertOrder("1.2.3-alpha", "1.2.3-alpha.1", -1);
+});
+
+test("build metadata is ignored for precedence", () => {
+  assertOrder("1.2.3+build.1", "1.2.3+build.2", 0);
+});
+
+test("compareVersions is usable as an Array.prototype.sort comparator", () => {
+  const sorted = ["2.0.0", "1.0.0-alpha", "1.0.0", "1.0.0-alpha.1"].sort(compareVersions);
+  if (sorted.join(",") !== "1.0.0-alpha,1.0.0-alpha.1,1.0.0,2.0.0") {
+    throw new Error(`unexpected sort order: ${sorted.join(",")}`);
+  }
+});
+
+test("compareVersions throws on a non-canonical string", () => {
+  let threw = false;
+  try {
+    compareVersions("v1.2.3", "1.2.3");
+  } catch {
+    threw = true;
+  }
+  if (!threw) {
+    throw new Error("expected compareVersions to throw on a non-canonical input");
   }
 });
 
