@@ -68,6 +68,23 @@ const versions = ["v2.0", "1.0.0-alpha", "01.0.0"]
 // ["1.0.0-alpha", "1.0.0", "2.0.0"]
 ```
 
+## CLI
+
+```
+semver-tidy v1.2 01.2.3-Beta.01
+# 1.2.0
+# 1.2.3-Beta.1
+
+echo v1.2 | semver-tidy
+# 1.2.0
+```
+
+With arguments, each one is formatted and printed on its own line. With no
+arguments, it reads stdin, one version per line. Either way, a rejected
+version is printed to stderr as `error: <input>: <reason>` instead of
+stdout, the rest of the batch still runs, and the process exits with
+status 1 if anything was rejected.
+
 ## Design
 
 Every exported function is pure: same input always produces the same
@@ -98,6 +115,6 @@ builds first, then executes the compiled output with `node`.
 
 Early skeleton. Core normalization for `major.minor.patch`, prerelease,
 and build metadata is implemented and covered by tests, as is
-`compareVersions` for sorting the normalized output. See the roadmap in
-the issue tracker for what's next (a CLI, explicit range/comparator
-handling).
+`compareVersions` for sorting the normalized output and a `semver-tidy`
+CLI for formatting argv or stdin. See the roadmap in the issue tracker for
+what's next (explicit range/comparator handling, publishing to npm).
